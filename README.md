@@ -1,4 +1,4 @@
-# AI Video Generator
+# AI Manim Video Generator
 
 Generate 2D mathematical and educational animations using natural language prompts. Powered by Manim and LLM-based code generation.
 
