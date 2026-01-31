@@ -1,3 +1,3 @@
-from .generator import VideoGenerator
+from .generator import VideoGenerator, GenerationResult
 
-__all__ = ["VideoGenerator"]
+__all__ = ["VideoGenerator", "GenerationResult"]

@@ -8,6 +8,9 @@ from src.llm import LLMClient
 from src.video import VideoGenerator
 
 
+MAX_RETRIES = 3
+
+
 def main():
     """Main entry point for the AI Video Generator."""
     print("=" * 60)
@@ -32,7 +35,6 @@ def main():
 
     print()
     print("-" * 60)
-    print("Generating Manim code...")
 
     # Initialize clients
     try:
@@ -43,46 +45,62 @@ def main():
 
     video_generator = VideoGenerator()
 
-    # Generate Manim code
+    # Generate script and code (two-phase)
+    print("Starting two-phase generation...")
+    print()
     try:
         manim_code = llm_client.generate_manim_code(user_prompt)
-        print("Manim code generated successfully.")
-        print()
-        print("Generated code preview:")
-        print("-" * 40)
-        # Show first 20 lines
-        lines = manim_code.split("\n")
-        preview = "\n".join(lines[:20])
-        if len(lines) > 20:
-            preview += f"\n... ({len(lines) - 20} more lines)"
-        print(preview)
-        print("-" * 40)
-        print()
+        print("Code generation complete.")
     except Exception as e:
         print(f"Error generating code: {e}")
         sys.exit(1)
 
-    # Generate video
-    print("Rendering video with Manim...")
-    print("(This may take a few moments)")
+    # Retry loop
+    for attempt in range(1, MAX_RETRIES + 1):
+        print(f"\nAttempt {attempt}/{MAX_RETRIES}: Rendering video...")
+
+        # Show code preview
+        lines = manim_code.split("\n")
+        preview = "\n".join(lines[:15])
+        if len(lines) > 15:
+            preview += f"\n... ({len(lines) - 15} more lines)"
+        print(f"\nCode preview:\n{'-' * 40}\n{preview}\n{'-' * 40}")
+
+        # Try to generate video
+        result = video_generator.generate(manim_code)
+
+        if result.success:
+            print()
+            print("=" * 60)
+            print("Video generated successfully!")
+            print(f"Output: {result.video_path}")
+            print("=" * 60)
+            return result.video_path
+
+        # Failed - show error
+        print(f"\nError on attempt {attempt}:")
+        print(result.error[:500] if len(result.error) > 500 else result.error)
+
+        if attempt < MAX_RETRIES:
+            print(f"\nAsking LLM to fix the code...")
+            try:
+                manim_code = llm_client.fix_code(manim_code, result.error)
+                print("Received fixed code.")
+            except Exception as e:
+                print(f"Error getting fix from LLM: {e}")
+                break
+
+    # All retries exhausted
     print()
-
-    try:
-        video_path = video_generator.generate(manim_code)
-        print("-" * 60)
-        print("Video generated successfully!")
-        print(f"Output: {video_path}")
-        print("-" * 60)
-    except RuntimeError as e:
-        print(f"Error generating video: {e}")
-        print()
-        print("The generated code may have errors. Here's the full code:")
-        print("=" * 40)
-        print(manim_code)
-        print("=" * 40)
-        sys.exit(1)
-
-    return video_path
+    print("=" * 60)
+    print(f"Failed to generate video after {MAX_RETRIES} attempts.")
+    print("The generated code has errors that couldn't be automatically fixed.")
+    print()
+    print("Last generated code:")
+    print("=" * 40)
+    print(manim_code)
+    print("=" * 40)
+    sys.exit(1)
 
 
 if __name__ == "__main__":
